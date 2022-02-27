@@ -6,7 +6,7 @@ namespace NeuralNetwork
 {
     class Network
     {
-        struct LayerT
+        struct Layer
         {
             public Vector x; // вход слоя
             public Vector z; // активированный выход слоя
@@ -14,28 +14,28 @@ namespace NeuralNetwork
         }
 
         Matrix[] weights; // матрицы весов слоя
-        LayerT[] L; // значения на каждом слое
+        Layer[] valueOnLayer; // значения на каждом слое
         Vector[] deltas; // дельты ошибки на каждом слое
 
-        int layersN; // число слоёв
+        int countLayers; // число слоёв
 
         public Network(int[] sizes)
         {
             Random random = new Random(DateTime.Now.Millisecond); // создаём генератор случайных чисел
 
-            layersN = sizes.Length - 1; // запоминаем число слоёв
+            countLayers = sizes.Length - 1; // запоминаем число слоёв
 
-            weights = new Matrix[layersN]; // создаём массив матриц весовых коэффициентов
-            L = new LayerT[layersN]; // создаём массив значений на каждом слое
-            deltas = new Vector[layersN]; // создаём массив для дельт
+            weights = new Matrix[countLayers]; // создаём массив матриц весовых коэффициентов
+            valueOnLayer = new Layer[countLayers]; // создаём массив значений на каждом слое
+            deltas = new Vector[countLayers]; // создаём массив для дельт
 
             for (int k = 1; k < sizes.Length; k++)
             {
                 weights[k - 1] = new Matrix(sizes[k], sizes[k - 1], random); // создаём матрицу весовых коэффициентов
 
-                L[k - 1].x = new Vector(sizes[k - 1]); // создаём вектор для входа слоя
-                L[k - 1].z = new Vector(sizes[k]); // создаём вектор для выхода слоя
-                L[k - 1].df = new Vector(sizes[k]); // создаём вектор для производной слоя
+                valueOnLayer[k - 1].x = new Vector(sizes[k - 1]); // создаём вектор для входа слоя
+                valueOnLayer[k - 1].z = new Vector(sizes[k]); // создаём вектор для выхода слоя
+                valueOnLayer[k - 1].df = new Vector(sizes[k]); // создаём вектор для производной слоя
 
                 deltas[k - 1] = new Vector(sizes[k]); // создаём вектор для дельт
             }
@@ -44,17 +44,17 @@ namespace NeuralNetwork
         // прямое распространение
         public Vector Forward(Vector input)
         {
-            for (int k = 0; k < layersN; k++)
+            for (int k = 0; k < countLayers; k++)
             {
                 if (k == 0)
                 {
                     for (int i = 0; i < input.n; i++)
-                        L[k].x[i] = input[i];
+                        valueOnLayer[k].x[i] = input[i];
                 }
                 else
                 {
-                    for (int i = 0; i < L[k - 1].z.n; i++)
-                        L[k].x[i] = L[k - 1].z[i];
+                    for (int i = 0; i < valueOnLayer[k - 1].z.n; i++)
+                        valueOnLayer[k].x[i] = valueOnLayer[k - 1].z[i];
                 }
 
                 for (int i = 0; i < weights[k].n; i++)
@@ -62,11 +62,11 @@ namespace NeuralNetwork
                     double y = 0;
 
                     for (int j = 0; j < weights[k].m; j++)
-                        y += weights[k][i, j] * L[k].x[j];
+                        y += weights[k][i, j] * valueOnLayer[k].x[j];
 
                     // активация с помощью сигмоидальной функции
-                    L[k].z[i] = 1 / (1 + Math.Exp(-y));
-                    L[k].df[i] = L[k].z[i] * (1 - L[k].z[i]);
+                    valueOnLayer[k].z[i] = 1 / (1 + Math.Exp(-y));
+                    valueOnLayer[k].df[i] = valueOnLayer[k].z[i] * (1 - valueOnLayer[k].z[i]);
 
                     // активация с помощью гиперболического тангенса
                     //L[k].z[i] = Math.Tanh(y);
@@ -78,21 +78,21 @@ namespace NeuralNetwork
                 }
             }
 
-            return L[layersN - 1].z; // возвращаем результат
+            return valueOnLayer[countLayers - 1].z; // возвращаем результат
         }
 
         // обратное распространение
         void Backward(Vector output, ref double error)
         {
-            int last = layersN - 1;
+            int last = countLayers - 1;
 
             error = 0; // обнуляем ошибку
 
             for (int i = 0; i < output.n; i++)
             {
-                double e = L[last].z[i] - output[i]; // находим разность значений векторов
+                double e = valueOnLayer[last].z[i] - output[i]; // находим разность значений векторов
 
-                deltas[last][i] = e * L[last].df[i]; // запоминаем дельту
+                deltas[last][i] = e * valueOnLayer[last].df[i]; // запоминаем дельту
                 error += e * e / 2; // прибавляем к ошибке половину квадрата значения
             }
 
@@ -106,7 +106,7 @@ namespace NeuralNetwork
                     for (int j = 0; j < weights[k].n; j++)
                         deltas[k - 1][i] += weights[k][j, i] * deltas[k][j];
 
-                    deltas[k - 1][i] *= L[k - 1].df[i]; // умножаем получаемое значение на производную предыдущего слоя
+                    deltas[k - 1][i] *= valueOnLayer[k - 1].df[i]; // умножаем получаемое значение на производную предыдущего слоя
                 }
             }
         }
@@ -114,13 +114,13 @@ namespace NeuralNetwork
         // обновление весовых коэффициентов, alpha - скорость обучения
         void UpdateWeights(double alpha)
         {
-            for (int k = 0; k < layersN; k++)
+            for (int k = 0; k < countLayers; k++)
             {
                 for (int i = 0; i < weights[k].n; i++)
                 {
                     for (int j = 0; j < weights[k].m; j++)
                     {
-                        weights[k][i, j] -= alpha * deltas[k][i] * L[k].x[j];
+                        weights[k][i, j] -= alpha * deltas[k][i] * valueOnLayer[k].x[j];
                     }
                 }
             }

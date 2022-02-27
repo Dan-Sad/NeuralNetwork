@@ -23,7 +23,7 @@ namespace NeuralNetwork
             v = new double[n];
 
             for (int i = 0; i < n; i++)
-                v[i] = values[i];
+                v = values;
         }
 
         // обращение по индексу
